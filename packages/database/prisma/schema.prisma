@@ -149,6 +149,7 @@ model Team {
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   teamPlayers TeamPlayer[]
+  matchPlayers MatchPlayer[]
   matchesHome Match[]      @relation("HomeTeam")
   matchesAway Match[]      @relation("AwayTeam")
 
@@ -165,6 +166,7 @@ model Player {
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   teamPlayers TeamPlayer[]
+  matchPlayers MatchPlayer[]
 
   @@index([tenantId])
 }
@@ -214,12 +216,31 @@ model Match {
   homeTeam   Team       @relation("HomeTeam", fields: [homeTeamId], references: [id])
   awayTeam   Team       @relation("AwayTeam", fields: [awayTeamId], references: [id])
   events     MatchEvent[]
+  matchPlayers MatchPlayer[]
 
   @@index([tenantId])
   @@index([tournamentId])
   @@index([venueId])
   @@index([homeTeamId])
   @@index([awayTeamId])
+}
+
+model MatchPlayer {
+  id            String   @id @default(uuid())
+  matchId       String
+  teamId        String
+  playerId      String
+  isCaptain     Boolean  @default(false)
+  isWicketKeeper Boolean @default(false)
+  createdAt     DateTime @default(now())
+
+  match  Match  @relation(fields: [matchId], references: [id])
+  team   Team   @relation(fields: [teamId], references: [id])
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@unique([matchId, playerId])
+  @@index([matchId, teamId])
+  @@index([playerId])
 }
 
 model MatchEvent {
