@@ -11,6 +11,7 @@ import { RedisModule } from './redis/redis.module';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { TenantModule } from './tenant/tenant.module';
 import { RbacModule } from './rbac/rbac.module';
+import { TournamentModule } from './tournament/tournament.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { RbacModule } from './rbac/rbac.module';
     HealthModule,
     TenantModule,
     RbacModule,
+    TournamentModule,
   ],
 })
 export class AppModule implements NestModule {
