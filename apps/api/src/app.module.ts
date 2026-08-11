@@ -13,6 +13,7 @@ import { TenantModule } from './tenant/tenant.module';
 import { RbacModule } from './rbac/rbac.module';
 import { TournamentModule } from './tournament/tournament.module';
 import { TeamModule } from './team/team.module';
+import { PlayerModule } from './player/player.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { TeamModule } from './team/team.module';
     RbacModule,
     TournamentModule,
     TeamModule,
+    PlayerModule,
   ],
 })
 export class AppModule implements NestModule {
