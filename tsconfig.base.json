@@ -1,0 +1,1 @@
+{ "compilerOptions": { "target": "ES2022", "module": "ESNext", "lib": ["ES2022", "DOM"], "strict": true, "moduleResolution": "Node", "esModuleInterop": true, "skipLibCheck": true, "outDir": ".next", "types": ["node"], "typeRoots": ["node_modules/@types"], "allowSyntheticDefaultImports": true, "forceConsistentCasingInFileNames": true }, "reference": [] }

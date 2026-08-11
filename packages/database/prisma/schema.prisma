@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum RoleName {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  TOURNAMENT_ADMIN
+  MATCH_REFEREE
+  SCORER
+  BACKUP_SCORER
+  UMPIRE
+  STATISTICIAN
+  TEAM_MANAGER
+  MEDIA_MANAGER
+  BROADCAST_USER
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  COMPLETED
+  ABANDONED
+  CANCELLED
+}
+
+model Tenant {
+  id        String       @id @default(uuid())
+  name      String
+  code      String       @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  users       User[]
+  tournaments Tournament[]
+  teams       Team[]
+  players     Player[]
+  venues      Venue[]
+  matches     Match[]
+  matchEvents MatchEvent[]
+  auditLogs   AuditLog[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  email     String   @unique
+  firstName String?
+  lastName  String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant?    @relation(fields: [tenantId], references: [id])
+  userRoles UserRole[]
+  auditLogs AuditLog[]
+
+  @@index([tenantId])
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        RoleName @unique
+  description String?
+
+  userRoles   UserRole[]
+  permissions Permission[]
+}
+
+model Permission {
+  id          String @id @default(uuid())
+  code        String @unique
+  description String?
+  roleId      String?
+
+  role Role? @relation(fields: [roleId], references: [id])
+
+  @@index([roleId])
+}
+
+model UserRole {
+  id           String   @id @default(uuid())
+  userId       String
+  roleId       String
+  tenantId     String?
+  tournamentId String?
+  matchId      String?
+  teamId       String?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@index([userId])
+  @@index([roleId])
+  @@index([tenantId])
+  @@index([tournamentId])
+  @@index([matchId])
+  @@index([teamId])
+}
+
+model Tournament {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  code      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  seasons Season[]
+  matches Match[]
+  events  MatchEvent[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model Season {
+  id           String   @id @default(uuid())
+  tournamentId String
+  name         String
+  startDate    DateTime?
+  endDate      DateTime?
+  createdAt    DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+
+  @@index([tournamentId])
+}
+
+model Team {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  shortName String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  teamPlayers TeamPlayer[]
+  matchesHome Match[]      @relation("HomeTeam")
+  matchesAway Match[]      @relation("AwayTeam")
+
+  @@index([tenantId])
+}
+
+model Player {
+  id        String   @id @default(uuid())
+  tenantId  String
+  firstName String
+  lastName  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  teamPlayers TeamPlayer[]
+
+  @@index([tenantId])
+}
+
+model TeamPlayer {
+  id        String   @id @default(uuid())
+  teamId    String
+  playerId  String
+  createdAt DateTime @default(now())
+
+  team   Team   @relation(fields: [teamId], references: [id])
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@unique([teamId, playerId])
+  @@index([playerId])
+}
+
+model Venue {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  city      String?
+  country   String?
+  createdAt DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  matches Match[]
+
+  @@index([tenantId])
+}
+
+model Match {
+  id           String      @id @default(uuid())
+  tenantId     String
+  tournamentId String
+  venueId      String?
+  homeTeamId   String
+  awayTeamId   String
+  status       MatchStatus @default(SCHEDULED)
+  scheduledAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  venue      Venue?     @relation(fields: [venueId], references: [id])
+  homeTeam   Team       @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam   Team       @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  events     MatchEvent[]
+
+  @@index([tenantId])
+  @@index([tournamentId])
+  @@index([venueId])
+  @@index([homeTeamId])
+  @@index([awayTeamId])
+}
+
+model MatchEvent {
+  id                String   @id @default(uuid())
+  tenantId          String
+  tournamentId      String
+  matchId           String
+  eventType         String
+  inningsNumber     Int?
+  overNumber        Int?
+  ballNumber        Int?
+  sequenceNumber    Int
+  payload           Json
+  createdBy         String?
+  createdAt         DateTime @default(now())
+  deviceId          String?
+  clientEventId     String
+  supersedesEventId String?
+  correlationId     String?
+
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  tournament   Tournament  @relation(fields: [tournamentId], references: [id])
+  match        Match       @relation(fields: [matchId], references: [id])
+  supersedes   MatchEvent? @relation("MatchEventSupersedes", fields: [supersedesEventId], references: [id])
+  supersededBy MatchEvent[] @relation("MatchEventSupersedes")
+
+  @@unique([matchId, sequenceNumber])
+  @@unique([tenantId, clientEventId])
+  @@index([tenantId])
+  @@index([tournamentId])
+  @@index([matchId])
+  @@index([supersedesEventId])
+  @@index([correlationId])
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  tenantId     String
+  userId       String?
+  action       String
+  entityType   String
+  entityId     String?
+  payload      Json?
+  correlationId String?
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([correlationId])
+}
