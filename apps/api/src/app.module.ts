@@ -1,7 +1,15 @@
-import { Module } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { HealthModule } from './health/health.module';
 import { DatabaseModule } from './database/database.module';
+import { HealthModule } from './health/health.module';
+import { RedisModule } from './redis/redis.module';
+import { TenantMiddleware } from './tenant/tenant.middleware';
+import { TenantModule } from './tenant/tenant.module';
 
 @Module({
   imports: [
@@ -10,7 +18,19 @@ import { DatabaseModule } from './database/database.module';
       envFilePath: '../../.env',
     }),
     DatabaseModule,
+    RedisModule,
     HealthModule,
+    TenantModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply(TenantMiddleware)
+      .exclude({
+        path: 'health',
+        method: RequestMethod.ALL,
+      })
+      .forRoutes('*');
+  }
+}
