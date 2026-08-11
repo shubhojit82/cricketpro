@@ -14,6 +14,7 @@ import { RbacModule } from './rbac/rbac.module';
 import { TournamentModule } from './tournament/tournament.module';
 import { TeamModule } from './team/team.module';
 import { PlayerModule } from './player/player.module';
+import { RosterModule } from './roster/roster.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { PlayerModule } from './player/player.module';
     TournamentModule,
     TeamModule,
     PlayerModule,
+    RosterModule,
   ],
 })
 export class AppModule implements NestModule {
