@@ -10,12 +10,26 @@ describe('PlayingXiService', () => {
   let tenantContext: any;
   let auditLogService: any;
 
-  const match = {
+  const match: {
+    id: string;
+    tenantId: string;
+    homeTeamId: string;
+    awayTeamId: string;
+    playingTeamSize: number | null;
+    status: MatchStatus;
+    tournament: {
+      playingTeamSize: number | null;
+    };
+  } = {
     id: 'match-1',
     tenantId: 'tenant-1',
     homeTeamId: 'team-a',
     awayTeamId: 'team-b',
+    playingTeamSize: null,
     status: MatchStatus.SCHEDULED,
+    tournament: {
+      playingTeamSize: 11,
+    },
   };
 
   const players = Array.from({ length: 11 }, (_, index) => ({
@@ -23,6 +37,21 @@ describe('PlayingXiService', () => {
     isCaptain: index === 0,
     isWicketKeeper: index === 1,
   }));
+
+  const buildPlayers = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      playerId: `player-${index + 1}`,
+      isCaptain: index === 0,
+      isWicketKeeper: index === 1,
+    }));
+
+  const buildMatch = (overrides: Partial<typeof match> = {}) => ({
+    ...match,
+    ...overrides,
+    tournament: {
+      playingTeamSize: overrides.tournament?.playingTeamSize ?? match.tournament.playingTeamSize,
+    },
+  });
 
   beforeEach(() => {
     prismaService = {
@@ -123,6 +152,13 @@ describe('PlayingXiService', () => {
     await expect(service.setPlayingXI('match-1', 'team-a', { players })).resolves.toBeDefined();
     expect(prismaService.match.findFirst).toHaveBeenCalledWith({
       where: { id: 'match-1', tenantId: 'tenant-2' },
+      include: {
+        tournament: {
+          select: {
+            playingTeamSize: true,
+          },
+        },
+      },
     });
   });
 
@@ -166,6 +202,127 @@ describe('PlayingXiService', () => {
   it('throws when lineup size is invalid', async () => {
     const shortLineup = players.slice(0, 10);
     await expect(service.setPlayingXI('match-1', 'team-a', { players: shortLineup })).rejects.toThrow(BadRequestException);
+  });
+
+  it('accepts exact tournament-configured lineup size of 8', async () => {
+    const tournamentPlayers = buildPlayers(8);
+    const matchWithConfig = buildMatch({ tournament: { playingTeamSize: 8 } });
+    prismaService.match.findFirst.mockResolvedValue(matchWithConfig);
+    prismaService.team.findFirst.mockResolvedValue({ id: 'team-a', tenantId: 'tenant-1' });
+    prismaService.player.findMany.mockResolvedValue(tournamentPlayers.map((player) => ({ id: player.playerId })));
+    prismaService.teamPlayer.findMany.mockResolvedValue(tournamentPlayers.map((player) => ({ playerId: player.playerId })));
+    prismaService.matchPlayer.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce(tournamentPlayers.map((player) => ({
+      matchId: matchWithConfig.id,
+      teamId: 'team-a',
+      playerId: player.playerId,
+      isCaptain: player.isCaptain,
+      isWicketKeeper: player.isWicketKeeper,
+      player: { id: player.playerId, firstName: 'First', lastName: 'Last' },
+    })));
+    prismaService.matchPlayer.deleteMany.mockResolvedValue({ count: 0 });
+    prismaService.matchPlayer.createMany.mockResolvedValue({ count: 8 });
+
+    const result = await service.setPlayingXI('match-1', 'team-a', { players: tournamentPlayers });
+
+    expect(prismaService.matchPlayer.createMany).toHaveBeenCalledWith({
+      data: tournamentPlayers.map((player) => ({
+        matchId: 'match-1',
+        teamId: 'team-a',
+        playerId: player.playerId,
+        isCaptain: player.isCaptain,
+        isWicketKeeper: player.isWicketKeeper,
+      })),
+    });
+    expect(result).toHaveLength(8);
+  });
+
+  it('accepts exact tournament-configured lineup size of 12', async () => {
+    const tournamentPlayers = buildPlayers(12);
+    const matchWithConfig = buildMatch({ tournament: { playingTeamSize: 12 } });
+    prismaService.match.findFirst.mockResolvedValue(matchWithConfig);
+    prismaService.team.findFirst.mockResolvedValue({ id: 'team-a', tenantId: 'tenant-1' });
+    prismaService.player.findMany.mockResolvedValue(tournamentPlayers.map((player) => ({ id: player.playerId })));
+    prismaService.teamPlayer.findMany.mockResolvedValue(tournamentPlayers.map((player) => ({ playerId: player.playerId })));
+    prismaService.matchPlayer.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce(tournamentPlayers.map((player) => ({
+      matchId: matchWithConfig.id,
+      teamId: 'team-a',
+      playerId: player.playerId,
+      isCaptain: player.isCaptain,
+      isWicketKeeper: player.isWicketKeeper,
+      player: { id: player.playerId, firstName: 'First', lastName: 'Last' },
+    })));
+    prismaService.matchPlayer.deleteMany.mockResolvedValue({ count: 0 });
+    prismaService.matchPlayer.createMany.mockResolvedValue({ count: 12 });
+
+    const result = await service.setPlayingXI('match-1', 'team-a', { players: tournamentPlayers });
+
+    expect(prismaService.matchPlayer.createMany).toHaveBeenCalledWith({
+      data: tournamentPlayers.map((player) => ({
+        matchId: 'match-1',
+        teamId: 'team-a',
+        playerId: player.playerId,
+        isCaptain: player.isCaptain,
+        isWicketKeeper: player.isWicketKeeper,
+      })),
+    });
+    expect(result).toHaveLength(12);
+  });
+
+  it('accepts exact match override lineup size of 6', async () => {
+    const matchWithOverride = buildMatch({ playingTeamSize: 6, tournament: { playingTeamSize: 11 } });
+    const matchPlayers = buildPlayers(6);
+    prismaService.match.findFirst.mockResolvedValue(matchWithOverride);
+    prismaService.team.findFirst.mockResolvedValue({ id: 'team-a', tenantId: 'tenant-1' });
+    prismaService.player.findMany.mockResolvedValue(matchPlayers.map((player) => ({ id: player.playerId })));
+    prismaService.teamPlayer.findMany.mockResolvedValue(matchPlayers.map((player) => ({ playerId: player.playerId })));
+    prismaService.matchPlayer.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce(matchPlayers.map((player) => ({
+      matchId: matchWithOverride.id,
+      teamId: 'team-a',
+      playerId: player.playerId,
+      isCaptain: player.isCaptain,
+      isWicketKeeper: player.isWicketKeeper,
+      player: { id: player.playerId, firstName: 'First', lastName: 'Last' },
+    })));
+    prismaService.matchPlayer.deleteMany.mockResolvedValue({ count: 0 });
+    prismaService.matchPlayer.createMany.mockResolvedValue({ count: 6 });
+
+    const result = await service.setPlayingXI('match-1', 'team-a', { players: matchPlayers });
+
+    expect(prismaService.matchPlayer.createMany).toHaveBeenCalledWith({
+      data: matchPlayers.map((player) => ({
+        matchId: 'match-1',
+        teamId: 'team-a',
+        playerId: player.playerId,
+        isCaptain: player.isCaptain,
+        isWicketKeeper: player.isWicketKeeper,
+      })),
+    });
+    expect(result).toHaveLength(6);
+  });
+
+  it('rejects lineup smaller than configured size', async () => {
+    const tournamentPlayers = buildPlayers(8);
+    const shortLineup = tournamentPlayers.slice(0, 7);
+    const matchWithConfig = buildMatch({ tournament: { playingTeamSize: 8 } });
+    prismaService.match.findFirst.mockResolvedValue(matchWithConfig);
+    prismaService.team.findFirst.mockResolvedValue({ id: 'team-a', tenantId: 'tenant-1' });
+    await expect(service.setPlayingXI('match-1', 'team-a', { players: shortLineup })).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects lineup larger than configured size', async () => {
+    const tournamentPlayers = buildPlayers(8);
+    const oversizedLineup = buildPlayers(9);
+    const matchWithConfig = buildMatch({ tournament: { playingTeamSize: 8 } });
+    prismaService.match.findFirst.mockResolvedValue(matchWithConfig);
+    prismaService.team.findFirst.mockResolvedValue({ id: 'team-a', tenantId: 'tenant-1' });
+    await expect(service.setPlayingXI('match-1', 'team-a', { players: oversizedLineup })).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects invalid configured playing team size', async () => {
+    const invalidMatch = buildMatch({ playingTeamSize: 0, tournament: { playingTeamSize: 11 } });
+    prismaService.match.findFirst.mockResolvedValue(invalidMatch);
+    prismaService.team.findFirst.mockResolvedValue({ id: 'team-a', tenantId: 'tenant-1' });
+    await expect(service.setPlayingXI('match-1', 'team-a', { players: players })).rejects.toThrow(BadRequestException);
   });
 
   it('throws when no captain is selected', async () => {

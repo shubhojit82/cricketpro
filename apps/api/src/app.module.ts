@@ -17,7 +17,9 @@ import { PlayerModule } from './player/player.module';
 import { RosterModule } from './roster/roster.module';
 import { VenueModule } from './venue/venue.module';
 import { MatchModule } from './match/match.module';
+import { MatchOfficialModule } from './match-official/match-official.module';
 import { PlayingXiModule } from './playing-xi/playing-xi.module';
+import { TossModule } from './toss/toss.module';
 
 @Module({
   imports: [
@@ -36,7 +38,9 @@ import { PlayingXiModule } from './playing-xi/playing-xi.module';
     RosterModule,
     VenueModule,
     MatchModule,
+    MatchOfficialModule,
     PlayingXiModule,
+    TossModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -30,11 +30,18 @@ export class PlayingXiService {
     return tenantId;
   }
 
-  private async assertMatchInTenant(matchId: string, tenantId: string): Promise<Match> {
+  private async assertMatchInTenant(matchId: string, tenantId: string): Promise<Match & { tournament: { playingTeamSize: number | null } }> {
     const match = await this.prismaService.match.findFirst({
       where: {
         id: matchId,
         tenantId,
+      },
+      include: {
+        tournament: {
+          select: {
+            playingTeamSize: true,
+          },
+        },
       },
     });
 
@@ -43,6 +50,16 @@ export class PlayingXiService {
     }
 
     return match;
+  }
+
+  private getEffectivePlayingTeamSize(match: Match & { tournament: { playingTeamSize: number | null } }): number {
+    const configuredSize = match.playingTeamSize ?? match.tournament?.playingTeamSize;
+
+    if (configuredSize !== undefined && configuredSize !== null && configuredSize <= 0) {
+      throw new BadRequestException('Configured playing team size must be a positive integer');
+    }
+
+    return configuredSize ?? DEFAULT_PLAYING_XI_SIZE;
   }
 
   private async assertTeamInTenant(teamId: string, tenantId: string): Promise<void> {
@@ -85,7 +102,7 @@ export class PlayingXiService {
     }
   }
 
-  private validatePlayerSelection(players: SetPlayingXiDto['players']): void {
+  private validatePlayerSelection(players: SetPlayingXiDto['players'], expectedSize: number): void {
     if (!Array.isArray(players) || players.length === 0) {
       throw new BadRequestException('Players array is required');
     }
@@ -97,10 +114,8 @@ export class PlayingXiService {
       throw new BadRequestException('Duplicate player selection is not allowed');
     }
 
-    if (playerIds.length !== DEFAULT_PLAYING_XI_SIZE) {
-      throw new BadRequestException(
-        `Playing XI must contain exactly ${DEFAULT_PLAYING_XI_SIZE} players`,
-      );
+    if (playerIds.length !== expectedSize) {
+      throw new BadRequestException(`Playing XI must contain exactly ${expectedSize} players`);
     }
 
     const captains = players.filter((player) => player.isCaptain);
@@ -120,7 +135,9 @@ export class PlayingXiService {
     await this.assertTeamInTenant(teamId, tenantId);
     this.assertTeamParticipatesInMatch(match, teamId);
     this.validateMatchEditable(match);
-    this.validatePlayerSelection(dto.players);
+
+    const expectedSize = this.getEffectivePlayingTeamSize(match);
+    this.validatePlayerSelection(dto.players, expectedSize);
 
     const playerIds = dto.players.map((player) => player.playerId);
     const players = await this.prismaService.player.findMany({
