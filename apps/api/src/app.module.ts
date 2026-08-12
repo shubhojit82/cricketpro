@@ -18,6 +18,7 @@ import { RosterModule } from './roster/roster.module';
 import { VenueModule } from './venue/venue.module';
 import { MatchModule } from './match/match.module';
 import { MatchOfficialModule } from './match-official/match-official.module';
+import { MatchLifecycleModule } from './match-lifecycle/match-lifecycle.module';
 import { PlayingXiModule } from './playing-xi/playing-xi.module';
 import { TossModule } from './toss/toss.module';
 
@@ -39,6 +40,7 @@ import { TossModule } from './toss/toss.module';
     VenueModule,
     MatchModule,
     MatchOfficialModule,
+    MatchLifecycleModule,
     PlayingXiModule,
     TossModule,
   ],

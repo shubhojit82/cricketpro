@@ -8,6 +8,7 @@ import { Match, MatchStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { MatchLifecycleService } from '../match-lifecycle/match-lifecycle.service';
 import { SetPlayingXiDto } from './dto/set-playing-xi.dto';
 import { UpdatePlayingXiPlayerDto } from './dto/update-playing-xi-player.dto';
 
@@ -19,6 +20,7 @@ export class PlayingXiService {
     private readonly prismaService: PrismaService,
     private readonly tenantContext: TenantContextService,
     private readonly auditLogService: AuditLogService,
+    private readonly matchLifecycleService: MatchLifecycleService,
   ) {}
 
   private getTenantId(): string {
@@ -95,11 +97,7 @@ export class PlayingXiService {
   }
 
   private validateMatchEditable(match: Match): void {
-    if (match.status === MatchStatus.LIVE || match.status === MatchStatus.COMPLETED) {
-      throw new ConflictException(
-        'Playing XI cannot be modified once the match is live or completed',
-      );
-    }
+    this.matchLifecycleService.assertCanEditLineup(match.status);
   }
 
   private validatePlayerSelection(players: SetPlayingXiDto['players'], expectedSize: number): void {

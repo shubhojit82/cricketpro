@@ -8,6 +8,7 @@ import { Match, MatchStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { MatchLifecycleService } from '../match-lifecycle/match-lifecycle.service';
 import { CreateMatchDto } from './dto/create-match.dto';
 import { UpdateMatchDto } from './dto/update-match.dto';
 import { UpdateMatchStatusDto } from './dto/update-match-status.dto';
@@ -18,6 +19,7 @@ export class MatchService {
     private readonly prismaService: PrismaService,
     private readonly tenantContext: TenantContextService,
     private readonly auditLogService: AuditLogService,
+    private readonly matchLifecycleService: MatchLifecycleService,
   ) {}
 
   private getTenantId(): string {
@@ -96,42 +98,11 @@ export class MatchService {
     return match;
   }
 
-  private isStatusTransitionAllowed(
-    current: MatchStatus,
-    next: MatchStatus,
-  ): boolean {
-    if (current === next) {
-      return true;
-    }
-
-    const allowedTransitions: Partial<Record<MatchStatus, MatchStatus[]>> = {
-      [MatchStatus.SCHEDULED]: [
-        MatchStatus.LIVE,
-        MatchStatus.ABANDONED,
-        MatchStatus.CANCELLED,
-      ],
-      [MatchStatus.LIVE]: [
-        MatchStatus.COMPLETED,
-        MatchStatus.ABANDONED,
-        MatchStatus.CANCELLED,
-      ],
-      [MatchStatus.COMPLETED]: [],
-      [MatchStatus.ABANDONED]: [],
-      [MatchStatus.CANCELLED]: [],
-    };
-
-    return (allowedTransitions[current] ?? []).includes(next);
-  }
-
   private validateStatusTransition(
     currentStatus: MatchStatus,
     nextStatus: MatchStatus,
   ): void {
-    if (!this.isStatusTransitionAllowed(currentStatus, nextStatus)) {
-      throw new BadRequestException(
-        `Invalid status transition from ${currentStatus} to ${nextStatus}`,
-      );
-    }
+    this.matchLifecycleService.assertTransitionAllowed(currentStatus, nextStatus);
   }
 
   async create(dto: CreateMatchDto): Promise<Match> {

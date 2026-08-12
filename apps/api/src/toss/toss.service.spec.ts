@@ -44,7 +44,21 @@ describe('TossService', () => {
     auditLogService = {
       record: jest.fn().mockResolvedValue({}),
     };
-    service = new TossService(prismaService, tenantContext, auditLogService);
+    service = new TossService(
+      prismaService,
+      tenantContext,
+      auditLogService,
+      {
+        assertCanEditToss: jest.fn((status) => {
+          if (status === MatchStatus.LIVE || status === MatchStatus.COMPLETED) {
+            throw new ConflictException(
+              'Toss cannot be changed once the match is live or completed',
+            );
+          }
+        }),
+        canEditToss: jest.fn((status) => status === MatchStatus.SCHEDULED),
+      } as any,
+    );
   });
 
   it('sets toss successfully and emits audit log', async () => {

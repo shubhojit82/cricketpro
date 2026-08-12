@@ -87,7 +87,20 @@ describe('PlayingXiService', () => {
       record: jest.fn().mockResolvedValue({}),
     };
 
-    service = new PlayingXiService(prismaService, tenantContext, auditLogService);
+    service = new PlayingXiService(
+      prismaService,
+      tenantContext,
+      auditLogService,
+      {
+        assertCanEditLineup: jest.fn((status) => {
+          if (status === MatchStatus.LIVE || status === MatchStatus.COMPLETED) {
+            throw new ConflictException(
+              'Playing XI cannot be modified once the match is live or completed',
+            );
+          }
+        }),
+      } as any,
+    );
   });
 
   it('sets Playing XI successfully and emits audit log', async () => {

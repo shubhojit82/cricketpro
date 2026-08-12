@@ -38,7 +38,21 @@ describe('MatchService', () => {
       record: jest.fn(),
     };
 
-    service = new MatchService(prismaService, tenantContext, auditLogService);
+    service = new MatchService(
+      prismaService,
+      tenantContext,
+      auditLogService,
+      {
+        assertTransitionAllowed: jest.fn((current, next) => {
+          if (
+            current === MatchStatus.COMPLETED && next === MatchStatus.LIVE ||
+            current === MatchStatus.SCHEDULED && next === MatchStatus.COMPLETED
+          ) {
+            throw new BadRequestException('Invalid status transition');
+          }
+        }),
+      } as any,
+    );
   });
 
   const createDto: CreateMatchDto = {

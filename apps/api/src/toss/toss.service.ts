@@ -8,6 +8,7 @@ import { Match, MatchStatus, Prisma, TossDecision } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { MatchLifecycleService } from '../match-lifecycle/match-lifecycle.service';
 import { SetTossDto } from './dto/set-toss.dto';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class TossService {
     private readonly prismaService: PrismaService,
     private readonly tenantContext: TenantContextService,
     private readonly auditLogService: AuditLogService,
+    private readonly matchLifecycleService: MatchLifecycleService,
   ) {}
 
   private getTenantId(): string {
@@ -105,22 +107,12 @@ export class TossService {
 
   private validateTossCanBeChanged(match: Match, existingToss?: { winnerTeamId: string; decision: TossDecision }) {
     if (!existingToss) {
-      if (match.status === MatchStatus.COMPLETED) {
-        throw new ConflictException('Toss cannot be recorded for a completed match');
-      }
+      this.matchLifecycleService.assertCanEditToss(match.status);
       return;
     }
 
-    if (
-      match.status === MatchStatus.LIVE ||
-      match.status === MatchStatus.COMPLETED
-    ) {
-      if (
-        existingToss.winnerTeamId !== existingToss.winnerTeamId ||
-        existingToss.decision !== existingToss.decision
-      ) {
-        // This condition is intentionally always false; exact match check is performed outside.
-      }
+    if (!this.matchLifecycleService.canEditToss(match.status)) {
+      throw new ConflictException('Toss cannot be changed once the match is live or completed');
     }
   }
 
@@ -129,6 +121,8 @@ export class TossService {
     const match = await this.assertMatchInTenant(matchId, tenantId);
     await this.assertTeamInTenant(dto.winnerTeamId, tenantId);
     this.assertWinnerTeamParticipates(match, dto.winnerTeamId);
+
+    this.matchLifecycleService.assertCanEditToss(match.status);
 
     const existingToss = await this.prismaService.matchToss.findUnique({
       where: {
@@ -143,12 +137,6 @@ export class TossService {
 
       if (isSame) {
         return existingToss;
-      }
-
-      if (match.status === MatchStatus.LIVE || match.status === MatchStatus.COMPLETED) {
-        throw new ConflictException(
-          'Toss cannot be changed once the match is live or completed',
-        );
       }
 
       await this.assertLineupsComplete(match);
@@ -178,10 +166,6 @@ export class TossService {
       });
 
       return updatedToss;
-    }
-
-    if (match.status === MatchStatus.COMPLETED) {
-      throw new ConflictException('Toss cannot be recorded for a completed match');
     }
 
     await this.assertLineupsComplete(match);

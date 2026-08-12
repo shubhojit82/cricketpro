@@ -35,6 +35,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     this.client.on('error', (error: Error) => {
       console.error('Redis error:', error.message);
     });
+
+    // Ensure Redis client is closed if the process is exiting (helps Jest worker cleanup)
+    process.once('beforeExit', () => {
+      if (this.client.isOpen) {
+        // best-effort, ignore errors
+        this.client.quit().catch(() => {});
+      }
+    });
   }
 
   async onModuleInit(): Promise<void> {

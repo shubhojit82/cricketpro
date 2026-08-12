@@ -14,6 +14,7 @@ import {
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { MatchLifecycleService } from '../match-lifecycle/match-lifecycle.service';
 import { CreateMatchOfficialDto } from './dto/create-match-official.dto';
 import { UpdateMatchOfficialDto } from './dto/update-match-official.dto';
 
@@ -23,6 +24,7 @@ export class MatchOfficialService {
     private readonly prismaService: PrismaService,
     private readonly tenantContext: TenantContextService,
     private readonly auditLogService: AuditLogService,
+    private readonly matchLifecycleService: MatchLifecycleService,
   ) {}
 
   private getTenantId(): string {
@@ -89,14 +91,7 @@ export class MatchOfficialService {
   }
 
   private validateMatchEditable(match: Match): void {
-    if (
-      match.status === MatchStatus.LIVE ||
-      match.status === MatchStatus.COMPLETED
-    ) {
-      throw new ConflictException(
-        'Match officials cannot be changed once the match is live or completed',
-      );
-    }
+    this.matchLifecycleService.assertCanEditOfficials(match.status);
   }
 
   private async assertUniqueOfficial(
